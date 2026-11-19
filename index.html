@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Камера</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body { background-color: #17212b; color: white; font-family: sans-serif; text-align: center; margin: 0; padding: 20px; }
+        video { width: 100%; max-width: 400px; border-radius: 10px; background: #000; }
+        canvas { display: none; }
+        button { margin-top: 20px; padding: 15px 30px; font-size: 18px; background-color: #2481cc; color: white; border: none; border-radius: 10px; cursor: pointer; width: 100%; max-width: 400px; }
+        button:disabled { background-color: gray; }
+        #status { margin-top: 20px; font-size: 16px; }
+    </style>
+</head>
+<body>
+    <h2>Сделай фото</h2>
+    <video id="video" autoplay playsinline></video>
+    <canvas id="canvas"></canvas>
+    <br>
+    <button id="captureBtn" disabled>📸 Сфотографировать и отправить</button>
+    <div id="status">Запрос доступа к камере...</div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const captureBtn = document.getElementById('captureBtn');
+        const statusDiv = document.getElementById('status');
+
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
+                .then(function (stream) {
+                    video.srcObject = stream;
+                    captureBtn.disabled = false;
+                    statusDiv.innerText = "Камера готова!";
+                })
+                .catch(function (error) {
+                    statusDiv.innerText = "❌ Ошибка доступа к камере. Разреши доступ в настройках.";
+                });
+        } else {
+            statusDiv.innerText = "❌ Твой браузер не поддерживает камеру.";
+        }
+
+        captureBtn.addEventListener('click', function () {
+            statusDiv.innerText = "Отправка...";
+            captureBtn.disabled = true;
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            const imageData = canvas.toDataURL('image/jpeg', 0.8);
+
+            // СЮДА ПОЗЖЕ ВСТАВИМ ССЫЛКУ НА СЕРВЕР (RENDER)
+            fetch('https://твой-сервер.onrender.com/upload', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    image: imageData,
+                    user_name: tg.initDataUnsafe?.user?.first_name || "Неизвестный",
+                    user_id: tg.initDataUnsafe?.user?.id || 0
+                })
+            })
+            .then(response => {
+                if(response.ok) {
+                    statusDiv.innerText = "✅ Фото отправлено!";
+                    tg.close();
+                } else {
+                    throw new Error();
+                }
+            })
+            .catch(err => {
+                statusDiv.innerText = "❌ Ошибка при отправке фото.";
+                captureBtn.disabled = false;
+            });
+        });
+    </script>
+</body>
+  </html>
